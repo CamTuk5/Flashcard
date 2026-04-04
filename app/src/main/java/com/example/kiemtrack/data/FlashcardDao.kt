@@ -13,14 +13,23 @@ interface FlashcardDao {
     fun getDueFlashcards(currentTime: Long): Flow<List<Flashcard>>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertFlashcard(flashcard: Flashcard)
+    suspend fun insertFlashcard(flashcard: Flashcard): Long
 
     @Update
     suspend fun updateFlashcard(flashcard: Flashcard)
 
     @Delete
     suspend fun deleteFlashcard(flashcard: Flashcard)
+
+    @Query("DELETE FROM flashcards WHERE courseId = :courseId")
+    suspend fun deleteCardsByCourse(courseId: String)
     
     @Query("SELECT * FROM flashcards WHERE id = :id")
     suspend fun getFlashcardById(id: Long): Flashcard?
+
+    @Query("SELECT * FROM flashcards WHERE courseId = :courseId")
+    fun getFlashcardsByCourse(courseId: String): Flow<List<Flashcard>>
+    
+    @Query("SELECT DISTINCT courseId FROM flashcards")
+    fun getAllCourseIds(): Flow<List<String>>
 }

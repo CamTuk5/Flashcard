@@ -8,15 +8,22 @@ import com.example.kiemtrack.model.Flashcard
 import com.example.kiemtrack.srs.SM2Logic
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
+// import com.google.firebase.firestore.FirebaseFirestore // MỞ KHI CÓ FILE JSON
 
 class FlashcardViewModel(application: Application) : AndroidViewModel(application) {
     private val dao = AppDatabase.getDatabase(application).flashcardDao()
+    // private val firestore = FirebaseFirestore.getInstance() // MỞ KHI CÓ FILE JSON
     
     val allCards: Flow<List<Flashcard>> = dao.getAllFlashcards()
     
-    fun addFlashcard(front: String, back: String) {
+    fun addFlashcard(front: String, back: String, courseId: String = "Chung") {
         viewModelScope.launch {
-            dao.insertFlashcard(Flashcard(front = front, back = back))
+            val card = Flashcard(front = front, back = back, courseId = courseId)
+            val id = dao.insertFlashcard(card)
+            
+            // LOGIC ĐẨY LÊN BACKEND (FIRESTORE)
+            // val remoteCard = card.copy(id = id)
+            // firestore.collection("flashcards").document(id.toString()).set(remoteCard)
         }
     }
 
@@ -24,10 +31,32 @@ class FlashcardViewModel(application: Application) : AndroidViewModel(applicatio
         viewModelScope.launch {
             val updatedCard = SM2Logic.calculateNextReview(flashcard, quality)
             dao.updateFlashcard(updatedCard)
+            
+            // CẬP NHẬT TIẾN ĐỘ LÊN BACKEND
+            // firestore.collection("flashcards").document(flashcard.id.toString()).set(updatedCard)
+        }
+    }
+
+    fun deleteFlashcard(flashcard: Flashcard) {
+        viewModelScope.launch {
+            dao.deleteFlashcard(flashcard)
+            // XOÁ TRÊN BACKEND
+            // firestore.collection("flashcards").document(flashcard.id.toString()).delete()
+        }
+    }
+
+    fun deleteCourse(courseId: String) {
+        viewModelScope.launch {
+            dao.deleteCardsByCourse(courseId)
+            // Logic xoá toàn bộ collection trên backend sẽ thực hiện ở đây
         }
     }
 
     fun getDueCards(currentTime: Long): Flow<List<Flashcard>> {
         return dao.getDueFlashcards(currentTime)
+    }
+    
+    fun getAllCourses(): Flow<List<String>> {
+        return dao.getAllCourseIds()
     }
 }

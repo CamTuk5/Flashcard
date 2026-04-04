@@ -3,18 +3,7 @@ package com.example.kiemtrack.srs
 import com.example.kiemtrack.model.Flashcard
 import java.util.Calendar
 import java.util.Date
-import kotlin.math.max
 
-/**
- * SuperMemo SM-2 Algorithm implementation.
- * Quality (q): 0-5
- * 5: perfect response
- * 4: correct response after a hesitation
- * 3: correct response recalled with serious difficulty
- * 2: incorrect response; where the correct one seemed easy to recall
- * 1: incorrect response; the correct one remembered
- * 0: complete blackout.
- */
 object SM2Logic {
     fun calculateNextReview(flashcard: Flashcard, quality: Int): Flashcard {
         var interval: Int
@@ -22,7 +11,6 @@ object SM2Logic {
         var easeFactor: Float
 
         if (quality >= 3) {
-            // Correct response
             if (flashcard.repetitions == 0) {
                 interval = 1
                 repetitions = 1
@@ -33,25 +21,19 @@ object SM2Logic {
                 interval = (flashcard.interval * flashcard.easeFactor).toInt()
                 repetitions = flashcard.repetitions + 1
             }
-            
-            // EF' := EF + (0.1 - (5-q) * (0.08 + (5-q) * 0.02))
             easeFactor = flashcard.easeFactor + (0.1f - (5 - quality) * (0.08f + (5 - quality) * 0.02f))
         } else {
-            // Incorrect response
             repetitions = 0
             interval = 1
             easeFactor = flashcard.easeFactor
         }
 
-        if (easeFactor < 1.3f) {
-            easeFactor = 1.3f
-        }
+        if (easeFactor < 1.3f) easeFactor = 1.3f
 
         val calendar = Calendar.getInstance()
         calendar.time = Date()
         calendar.add(Calendar.DAY_OF_YEAR, interval)
         
-        // Reset time to start of day for easier filtering
         calendar.set(Calendar.HOUR_OF_DAY, 0)
         calendar.set(Calendar.MINUTE, 0)
         calendar.set(Calendar.SECOND, 0)
@@ -61,7 +43,8 @@ object SM2Logic {
             interval = interval,
             repetitions = repetitions,
             easeFactor = easeFactor,
-            nextReviewDate = calendar.timeInMillis
+            nextReviewDate = calendar.timeInMillis,
+            lastReviewDate = System.currentTimeMillis() // Cập nhật ngày học xong
         )
     }
 }
