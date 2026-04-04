@@ -3,6 +3,7 @@ plugins {
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.ksp)
+    alias(libs.plugins.google-services)
 }
 
 android {
@@ -39,7 +40,7 @@ android {
 }
 
 dependencies {
-    implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.core-ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
     implementation(platform(libs.androidx.compose.bom))
@@ -56,6 +57,11 @@ dependencies {
     
     // WorkManager
     implementation(libs.androidx.work.runtime.ktx)
+
+    // Firebase
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.firestore.ktx)
+    implementation(libs.firebase.auth-ktx)
 
     debugImplementation(libs.androidx.compose.ui.tooling)
 }
