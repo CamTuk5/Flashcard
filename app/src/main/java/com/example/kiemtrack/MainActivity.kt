@@ -1,9 +1,12 @@
 package com.example.kiemtrack
 
+import android.Manifest
+import android.os.Build
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
@@ -37,18 +40,31 @@ import java.util.Locale
 import java.util.concurrent.TimeUnit
 
 class MainActivity : ComponentActivity() {
-    private lateinit var ttsHelper: TtsHelper
+    private var ttsHelper: TtsHelper? = null
+
+    private val requestPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { isGranted: Boolean ->
+        // Permission result handled if needed
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        
+        // Initialize TTS lazily or handle it in a way that doesn't block startup
         ttsHelper = TtsHelper(this)
         
         scheduleDailyReminder()
 
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            requestPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+
         setContent {
             KiemTraCkTheme {
                 val navController = rememberNavController()
+                // The viewModel is scoped to the NavHost or Activity, initialized lazily on first access
                 val viewModel: FlashcardViewModel = viewModel()
 
                 NavHost(navController = navController, startDestination = "home") {
@@ -68,7 +84,7 @@ class MainActivity : ComponentActivity() {
                         val courseId = backStackEntry.arguments?.getString("courseId")
                         StudyScreen(
                             viewModel = viewModel,
-                            ttsHelper = ttsHelper,
+                            ttsHelper = ttsHelper ?: TtsHelper(this@MainActivity),
                             courseId = courseId,
                             onFinish = { navController.popBackStack() }
                         )
@@ -98,7 +114,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-        ttsHelper.shutdown()
+        ttsHelper?.shutdown()
     }
 }
 
@@ -136,7 +152,6 @@ fun HomeScreen(
                 modifier = Modifier.fillMaxSize(),
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
-                // Khóa học "Tất cả thẻ" - CHỈ HIỆN TÊN VÀ TỔNG SỐ
                 item {
                     Card(
                         modifier = Modifier.fillMaxWidth(),
@@ -151,7 +166,6 @@ fun HomeScreen(
                     }
                 }
 
-                // Từng khóa học cụ thể - HIỆN THỜI GIAN VÀ TRẠNG THÁI
                 items(courses) { course ->
                     if (course != "All") {
                         val cardsInCourse = allCards.filter { it.courseId == course }

@@ -6,13 +6,13 @@ import androidx.lifecycle.viewModelScope
 import com.example.kiemtrack.data.AppDatabase
 import com.example.kiemtrack.model.Flashcard
 import com.example.kiemtrack.srs.SM2Logic
+// import com.google.firebase.firestore.FirebaseFirestore // Removed because google-services.json is missing
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.launch
-// import com.google.firebase.firestore.FirebaseFirestore // MỞ KHI CÓ FILE JSON
 
 class FlashcardViewModel(application: Application) : AndroidViewModel(application) {
     private val dao = AppDatabase.getDatabase(application).flashcardDao()
-    // private val firestore = FirebaseFirestore.getInstance() // MỞ KHI CÓ FILE JSON
+    // private val firestore = FirebaseFirestore.getInstance() // Disabled because google-services.json is missing
     
     val allCards: Flow<List<Flashcard>> = dao.getAllFlashcards()
     
@@ -21,7 +21,7 @@ class FlashcardViewModel(application: Application) : AndroidViewModel(applicatio
             val card = Flashcard(front = front, back = back, courseId = courseId)
             val id = dao.insertFlashcard(card)
             
-            // LOGIC ĐẨY LÊN BACKEND (FIRESTORE)
+            // ĐẨY LÊN BACKEND (FIRESTORE) - Disabled because google-services.json is missing
             // val remoteCard = card.copy(id = id)
             // firestore.collection("flashcards").document(id.toString()).set(remoteCard)
         }
@@ -32,7 +32,7 @@ class FlashcardViewModel(application: Application) : AndroidViewModel(applicatio
             val updatedCard = SM2Logic.calculateNextReview(flashcard, quality)
             dao.updateFlashcard(updatedCard)
             
-            // CẬP NHẬT TIẾN ĐỘ LÊN BACKEND
+            // CẬP NHẬT TIẾN ĐỘ LÊN BACKEND - Disabled because google-services.json is missing
             // firestore.collection("flashcards").document(flashcard.id.toString()).set(updatedCard)
         }
     }
@@ -40,7 +40,7 @@ class FlashcardViewModel(application: Application) : AndroidViewModel(applicatio
     fun deleteFlashcard(flashcard: Flashcard) {
         viewModelScope.launch {
             dao.deleteFlashcard(flashcard)
-            // XOÁ TRÊN BACKEND
+            // XOÁ TRÊN BACKEND - Disabled because google-services.json is missing
             // firestore.collection("flashcards").document(flashcard.id.toString()).delete()
         }
     }
@@ -48,7 +48,7 @@ class FlashcardViewModel(application: Application) : AndroidViewModel(applicatio
     fun deleteCourse(courseId: String) {
         viewModelScope.launch {
             dao.deleteCardsByCourse(courseId)
-            // Logic xoá toàn bộ collection trên backend sẽ thực hiện ở đây
+            // Logic xoá toàn bộ collection trên backend (có thể triển khai thêm tuỳ nhu cầu)
         }
     }
 

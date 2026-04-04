@@ -3,8 +3,7 @@ plugins {
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.ksp)
-    // Temporarily disabled Firebase until google-services.json is added
-    // alias(libs.plugins.google.services)
+    // alias(libs.plugins.google.services) // Disabled because google-services.json is missing
 }
 
 android {
@@ -59,7 +58,7 @@ dependencies {
     // WorkManager
     implementation(libs.androidx.work.runtime.ktx)
 
-    // Firebase (Temporarily disabled)
+    // Firebase (Disabled temporarily)
     // implementation(platform(libs.firebase.bom))
     // implementation(libs.firebase.firestore.ktx)
     // implementation(libs.firebase.auth.ktx)

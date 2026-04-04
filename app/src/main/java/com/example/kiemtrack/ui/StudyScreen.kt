@@ -10,6 +10,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
@@ -67,7 +68,6 @@ fun StudyScreen(
                 }
             }
         } else if (showReviewSummary && lastReviewedCard != null) {
-            // MÀN HÌNH SAU KHI ĐÁNH GIÁ XONG 1 THẺ
             Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(16.dp)) {
                     Text("Đã ghi nhận kết quả!", style = MaterialTheme.typography.headlineSmall)
@@ -166,28 +166,41 @@ fun StudyScreen(
                 } else if (!isFlippedToBack) {
                     Button(onClick = { isFlippedToBack = true }) { Text("Xem nghĩa (Lật thẻ)") }
                 } else {
-                    Text("Đánh giá độ khó:", style = MaterialTheme.typography.titleMedium)
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
-                        (0..5).forEach { quality ->
-                            Button(
-                                onClick = {
-                                    // Tính toán và cập nhật logic SM-2
-                                    val updatedCard = com.example.kiemtrack.srs.SM2Logic.calculateNextReview(currentCard, quality)
-                                    viewModel.updateFlashcardQuality(currentCard, quality)
-                                    
-                                    // Hiển thị tóm tắt và lưu lại thẻ vừa học để xoá nếu cần
-                                    lastReviewedCard = updatedCard
+                    Text("Bạn thấy thẻ này thế nào?", style = MaterialTheme.typography.titleMedium)
+                    Spacer(modifier = Modifier.height(12.dp))
+                    
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            QualityButton("Quên", 0, Color(0xFFE57373), Modifier.weight(1f)) {
+                                updateQuality(viewModel, currentCard, 0) { updated ->
+                                    lastReviewedCard = updated
                                     showReviewSummary = true
-                                    
-                                    // Reset cho thẻ thật sự tiếp theo (sau summary)
-                                    isFrontRevealed = false
-                                    isFlippedToBack = false
                                     currentIndex++
-                                },
-                                modifier = Modifier.weight(1f).padding(2.dp),
-                                contentPadding = PaddingValues(0.dp)
-                            ) { Text(quality.toString()) }
+                                }
+                            }
+                            QualityButton("Khó", 2, Color(0xFFFFB74D), Modifier.weight(1f)) {
+                                updateQuality(viewModel, currentCard, 2) { updated ->
+                                    lastReviewedCard = updated
+                                    showReviewSummary = true
+                                    currentIndex++
+                                }
+                            }
+                        }
+                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            QualityButton("Tốt", 4, Color(0xFF81C784), Modifier.weight(1f)) {
+                                updateQuality(viewModel, currentCard, 4) { updated ->
+                                    lastReviewedCard = updated
+                                    showReviewSummary = true
+                                    currentIndex++
+                                }
+                            }
+                            QualityButton("Dễ", 5, Color(0xFF64B5F6), Modifier.weight(1f)) {
+                                updateQuality(viewModel, currentCard, 5) { updated ->
+                                    lastReviewedCard = updated
+                                    showReviewSummary = true
+                                    currentIndex++
+                                }
+                            }
                         }
                     }
                 }
@@ -195,10 +208,27 @@ fun StudyScreen(
         } else {
             Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("🎉 Hoàn thành bài học!")
-                    Button(onClick = onFinish, modifier = Modifier.padding(top = 16.dp)) { Text("Xong") }
+                    Text("🎉 Hoàn thành bài học!", style = MaterialTheme.typography.headlineMedium)
+                    Button(onClick = onFinish, modifier = Modifier.padding(top = 16.dp)) { Text("Quay lại màn hình chính") }
                 }
             }
         }
     }
+}
+
+@Composable
+fun QualityButton(label: String, quality: Int, color: Color, modifier: Modifier, onClick: () -> Unit) {
+    Button(
+        onClick = onClick,
+        modifier = modifier.height(48.dp),
+        colors = ButtonDefaults.buttonColors(containerColor = color)
+    ) {
+        Text(label, color = Color.White)
+    }
+}
+
+private fun updateQuality(viewModel: FlashcardViewModel, card: Flashcard, quality: Int, onComplete: (Flashcard) -> Unit) {
+    val updatedCard = com.example.kiemtrack.srs.SM2Logic.calculateNextReview(card, quality)
+    viewModel.updateFlashcardQuality(card, quality)
+    onComplete(updatedCard)
 }
