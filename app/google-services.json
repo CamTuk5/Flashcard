@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "340516455722",
+    "project_id": "flashcard-481f3",
+    "storage_bucket": "flashcard-481f3.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:340516455722:android:7865f764ca06c6a9228a53",
+        "android_client_info": {
+          "package_name": "com.example.kiemtrack"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBMfvO5fW8Xf7-jjQjngtqCGtiKm_sYkS0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
