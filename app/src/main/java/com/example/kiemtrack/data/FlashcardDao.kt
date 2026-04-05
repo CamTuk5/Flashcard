@@ -27,8 +27,8 @@ interface FlashcardDao {
     @Query("SELECT * FROM flashcards WHERE id = :id")
     suspend fun getFlashcardById(id: Long): Flashcard?
 
-    @Query("SELECT * FROM flashcards WHERE courseId = :courseId")
-    fun getFlashcardsByCourse(courseId: String): Flow<List<Flashcard>>
+    @Query("SELECT * FROM flashcards WHERE courseId = :courseId AND nextReviewDate <= :currentTime")
+    fun getDueFlashcardsByCourse(courseId: String, currentTime: Long): Flow<List<Flashcard>>
     
     @Query("SELECT DISTINCT courseId FROM flashcards")
     fun getAllCourseIds(): Flow<List<String>>

@@ -5,6 +5,7 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -27,17 +28,10 @@ fun StudyScreen(
     courseId: String? = null,
     onFinish: () -> Unit
 ) {
-    val allCards by viewModel.allCards.collectAsState(initial = emptyList())
+    val currentTime = remember { System.currentTimeMillis() }
+    val dueCards by viewModel.getDueCardsByCourse(courseId ?: "All", currentTime).collectAsState(initial = emptyList())
     
-    val courseCards = remember(allCards, courseId) {
-        if (courseId != null && courseId != "All") {
-            allCards.filter { it.courseId == courseId }
-        } else {
-            allCards
-        }
-    }
-
-    var currentIndex by remember { mutableStateOf(0) }
+    var currentIndex by remember { mutableIntStateOf(0) }
     var isFrontRevealed by remember { mutableStateOf(false) }
     var isFlippedToBack by remember { mutableStateOf(false) }
     var showReviewSummary by remember { mutableStateOf(false) }
@@ -45,13 +39,19 @@ fun StudyScreen(
 
     val rotation by animateFloatAsState(
         targetValue = if (isFlippedToBack) 180f else 0f,
-        animationSpec = tween(durationMillis = 500)
+        animationSpec = tween(durationMillis = 500), label = "cardRotation"
     )
+
+    // Reset state when moving to next card
+    LaunchedEffect(currentIndex) {
+        isFrontRevealed = false
+        isFlippedToBack = false
+    }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Đang học: ${courseId ?: "Tất cả"}") },
+                title = { Text("Ôn tập: ${courseId ?: "Tất cả"}") },
                 navigationIcon = {
                     IconButton(onClick = onFinish) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Quay lại")
@@ -60,10 +60,12 @@ fun StudyScreen(
             )
         }
     ) { padding ->
-        if (courseCards.isEmpty()) {
+        if (dueCards.isEmpty()) {
             Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("Chưa có thẻ nào!")
+                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(16.dp)) {
+                    Icon(Icons.Default.CheckCircle, contentDescription = null, modifier = Modifier.size(64.dp), tint = Color(0xFF4CAF50))
+                    Spacer(modifier = Modifier.height(16.dp))
+                    Text("Tuyệt vời! Bạn đã hoàn thành hết các thẻ cần ôn tập.", textAlign = androidx.compose.ui.text.style.TextAlign.Center)
                     Button(onClick = onFinish, modifier = Modifier.padding(top = 16.dp)) { Text("Quay lại") }
                 }
             }
@@ -82,11 +84,12 @@ fun StudyScreen(
                     Row {
                         Button(onClick = {
                             showReviewSummary = false
-                            if (currentIndex >= courseCards.size) {
-                                onFinish()
+                            if (currentIndex >= dueCards.size) {
+                                // Nếu hết thẻ, quay về (thực ra flow.collectAsState sẽ cập nhật dueCards rỗng)
+                                // Nhưng an toàn thì ta check currentIndex
                             }
                         }) {
-                            Text(if (currentIndex < courseCards.size) "Thẻ tiếp theo" else "Hoàn thành")
+                            Text(if (currentIndex < dueCards.size) "Thẻ tiếp theo" else "Hoàn thành")
                         }
                         
                         Spacer(modifier = Modifier.width(16.dp))
@@ -95,27 +98,24 @@ fun StudyScreen(
                             onClick = {
                                 viewModel.deleteFlashcard(lastReviewedCard!!)
                                 showReviewSummary = false
-                                if (currentIndex >= courseCards.size) {
-                                    onFinish()
-                                }
                             },
                             colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)
                         ) {
                             Icon(Icons.Default.Delete, contentDescription = null)
-                            Text(" Xóa thẻ này")
+                            Text(" Xóa thẻ")
                         }
                     }
                 }
             }
-        } else if (currentIndex < courseCards.size) {
-            val currentCard = courseCards[currentIndex]
+        } else if (currentIndex < dueCards.size) {
+            val currentCard = dueCards[currentIndex]
 
             Column(
                 modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Center
             ) {
-                Text("Thẻ số ${currentIndex + 1} / ${courseCards.size}", style = MaterialTheme.typography.labelLarge)
+                Text("Thẻ số ${currentIndex + 1} / ${dueCards.size}", style = MaterialTheme.typography.labelLarge)
                 Spacer(modifier = Modifier.height(16.dp))
 
                 Card(
@@ -166,50 +166,40 @@ fun StudyScreen(
                 } else if (!isFlippedToBack) {
                     Button(onClick = { isFlippedToBack = true }) { Text("Xem nghĩa (Lật thẻ)") }
                 } else {
-                    Text("Bạn thấy thẻ này thế nào?", style = MaterialTheme.typography.titleMedium)
+                    Text("Bạn nhớ từ này thế nào?", style = MaterialTheme.typography.titleMedium)
                     Spacer(modifier = Modifier.height(12.dp))
                     
                     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             QualityButton("Quên", 0, Color(0xFFE57373), Modifier.weight(1f)) {
-                                updateQuality(viewModel, currentCard, 0) { updated ->
-                                    lastReviewedCard = updated
-                                    showReviewSummary = true
-                                    currentIndex++
-                                }
+                                val updated = com.example.kiemtrack.srs.SM2Logic.calculateNextReview(currentCard, 0)
+                                viewModel.updateFlashcardQuality(currentCard, 0)
+                                lastReviewedCard = updated
+                                showReviewSummary = true
+                                // Không tăng currentIndex ở đây vì thẻ có thể bị đẩy xuống cuối hoặc biến mất khỏi due list
                             }
                             QualityButton("Khó", 2, Color(0xFFFFB74D), Modifier.weight(1f)) {
-                                updateQuality(viewModel, currentCard, 2) { updated ->
-                                    lastReviewedCard = updated
-                                    showReviewSummary = true
-                                    currentIndex++
-                                }
+                                val updated = com.example.kiemtrack.srs.SM2Logic.calculateNextReview(currentCard, 2)
+                                viewModel.updateFlashcardQuality(currentCard, 2)
+                                lastReviewedCard = updated
+                                showReviewSummary = true
                             }
                         }
                         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             QualityButton("Tốt", 4, Color(0xFF81C784), Modifier.weight(1f)) {
-                                updateQuality(viewModel, currentCard, 4) { updated ->
-                                    lastReviewedCard = updated
-                                    showReviewSummary = true
-                                    currentIndex++
-                                }
+                                val updated = com.example.kiemtrack.srs.SM2Logic.calculateNextReview(currentCard, 4)
+                                viewModel.updateFlashcardQuality(currentCard, 4)
+                                lastReviewedCard = updated
+                                showReviewSummary = true
                             }
                             QualityButton("Dễ", 5, Color(0xFF64B5F6), Modifier.weight(1f)) {
-                                updateQuality(viewModel, currentCard, 5) { updated ->
-                                    lastReviewedCard = updated
-                                    showReviewSummary = true
-                                    currentIndex++
-                                }
+                                val updated = com.example.kiemtrack.srs.SM2Logic.calculateNextReview(currentCard, 5)
+                                viewModel.updateFlashcardQuality(currentCard, 5)
+                                lastReviewedCard = updated
+                                showReviewSummary = true
                             }
                         }
                     }
-                }
-            }
-        } else {
-            Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text("🎉 Hoàn thành bài học!", style = MaterialTheme.typography.headlineMedium)
-                    Button(onClick = onFinish, modifier = Modifier.padding(top = 16.dp)) { Text("Quay lại màn hình chính") }
                 }
             }
         }

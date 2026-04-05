@@ -35,6 +35,7 @@ import com.example.kiemtrack.ui.TtsHelper
 import com.example.kiemtrack.ui.theme.KiemTraCkTheme
 import com.example.kiemtrack.worker.ReminderWorker
 import java.text.SimpleDateFormat
+import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 import java.util.concurrent.TimeUnit
@@ -101,13 +102,29 @@ class MainActivity : ComponentActivity() {
     }
 
     private fun scheduleDailyReminder() {
+        val currentDate = Calendar.getInstance()
+        val dueDate = Calendar.getInstance()
+
+        // Thiết lập thời gian thông báo vào 9:00 AM
+        dueDate.set(Calendar.HOUR_OF_DAY, 9)
+        dueDate.set(Calendar.MINUTE, 0)
+        dueDate.set(Calendar.SECOND, 0)
+
+        // Nếu đã qua 9:00 AM thì hẹn vào sáng mai
+        if (dueDate.before(currentDate)) {
+            dueDate.add(Calendar.HOUR_OF_DAY, 24)
+        }
+
+        val initialDelay = dueDate.timeInMillis - currentDate.timeInMillis
+
         val reminderRequest = PeriodicWorkRequestBuilder<ReminderWorker>(24, TimeUnit.HOURS)
+            .setInitialDelay(initialDelay, TimeUnit.MILLISECONDS)
             .setConstraints(Constraints.Builder().setRequiredNetworkType(NetworkType.NOT_REQUIRED).build())
             .build()
 
         WorkManager.getInstance(this).enqueueUniquePeriodicWork(
             "daily_reminder",
-            ExistingPeriodicWorkPolicy.KEEP,
+            ExistingPeriodicWorkPolicy.UPDATE,
             reminderRequest
         )
     }
@@ -153,14 +170,26 @@ fun HomeScreen(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 item {
+                    val allDueCardsCount = allCards.count { it.nextReviewDate <= System.currentTimeMillis() }
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         onClick = { onStartStudy("All") },
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
+                        colors = CardDefaults.cardColors(
+                            containerColor = if (allDueCardsCount > 0) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.primaryContainer
+                        )
                     ) {
                         ListItem(
                             headlineContent = { Text("Tất cả thẻ", style = MaterialTheme.typography.titleMedium) },
-                            supportingContent = { Text("Tổng số: ${allCards.size} thẻ") },
+                            supportingContent = { 
+                                Column {
+                                    Text("Tổng số: ${allCards.size} thẻ")
+                                    if (allDueCardsCount > 0) {
+                                        Text("Cần ôn tập ngay: $allDueCardsCount thẻ", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                                    } else {
+                                        Text("Tuyệt vời! Bạn đã học hết thẻ hôm nay", color = Color(0xFF2E7D32), style = MaterialTheme.typography.bodySmall)
+                                    }
+                                }
+                            },
                             colors = ListItemDefaults.colors(containerColor = Color.Transparent)
                         )
                     }
@@ -169,7 +198,8 @@ fun HomeScreen(
                 items(courses) { course ->
                     if (course != "All") {
                         val cardsInCourse = allCards.filter { it.courseId == course }
-                        val isCompleted = cardsInCourse.isNotEmpty() && cardsInCourse.all { it.nextReviewDate > System.currentTimeMillis() }
+                        val dueInCourse = cardsInCourse.count { it.nextReviewDate <= System.currentTimeMillis() }
+                        val isCompleted = cardsInCourse.isNotEmpty() && dueInCourse == 0
                         val lastReview = cardsInCourse.map { it.lastReviewDate }.maxOrNull() ?: 0L
 
                         Card(
@@ -184,14 +214,12 @@ fun HomeScreen(
                                 supportingContent = { 
                                     Column {
                                         Text("Tổng số: ${cardsInCourse.size} thẻ")
-                                        if (lastReview > 0L) {
-                                            Text("Học xong lúc: ${dateFormat.format(Date(lastReview))}", style = MaterialTheme.typography.bodySmall)
+                                        if (dueInCourse > 0) {
+                                            Text("Cần ôn tập: $dueInCourse thẻ", color = MaterialTheme.colorScheme.error)
                                         }
-                                        Text(
-                                            if (isCompleted) "Trạng thái: Đã hoàn thành" else "Trạng thái: Chưa hoàn thành",
-                                            style = MaterialTheme.typography.bodySmall,
-                                            color = if (isCompleted) Color(0xFF2E7D32) else MaterialTheme.colorScheme.error
-                                        )
+                                        if (lastReview > 0L) {
+                                            Text("Lần cuối: ${dateFormat.format(Date(lastReview))}", style = MaterialTheme.typography.bodySmall)
+                                        }
                                     }
                                 },
                                 trailingContent = {

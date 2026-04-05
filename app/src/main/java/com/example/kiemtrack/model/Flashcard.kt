@@ -8,8 +8,8 @@ data class Flashcard(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val remoteId: String = "",
     val courseId: String = "default_course",
-    val front: String,
-    val back: String,
+    val front: String = "",
+    val back: String = "",
     // SM-2 fields
     val interval: Int = 0,
     val repetitions: Int = 0,
