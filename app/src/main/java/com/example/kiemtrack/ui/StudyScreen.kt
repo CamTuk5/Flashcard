@@ -1,202 +1,243 @@
 package com.example.kiemtrack.ui
 
+import androidx.compose.animation.*
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.CheckCircle
-import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.VolumeUp
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.kiemtrack.model.Flashcard
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun StudyScreen(
     viewModel: FlashcardViewModel = viewModel(),
     ttsHelper: TtsHelper,
-    courseId: String? = null,
     onFinish: () -> Unit
 ) {
     val currentTime = remember { System.currentTimeMillis() }
-    val dueCards by viewModel.getDueCardsByCourse(courseId ?: "All", currentTime).collectAsState(initial = emptyList())
+    val dueCards by viewModel.getDueCards(currentTime).collectAsState(initial = emptyList())
     
     var currentIndex by remember { mutableIntStateOf(0) }
-    var isFrontRevealed by remember { mutableStateOf(false) }
     var isFlippedToBack by remember { mutableStateOf(false) }
-    var showReviewSummary by remember { mutableStateOf(false) }
-    var lastReviewedCard by remember { mutableStateOf<Flashcard?>(null) }
 
     val rotation by animateFloatAsState(
         targetValue = if (isFlippedToBack) 180f else 0f,
         animationSpec = tween(durationMillis = 500), label = "cardRotation"
     )
 
-    // Reset state when moving to next card
     LaunchedEffect(currentIndex) {
-        isFrontRevealed = false
         isFlippedToBack = false
     }
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Ôn tập: ${courseId ?: "Tất cả"}") },
+                title = { 
+                    Column {
+                        Text("Ôn tập từ vựng", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold))
+                        if (dueCards.isNotEmpty()) {
+                            Text(
+                                "${currentIndex + 1} trên ${dueCards.size}", 
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.outline
+                            )
+                        }
+                    }
+                },
                 navigationIcon = {
                     IconButton(onClick = onFinish) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Quay lại")
                     }
-                }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = MaterialTheme.colorScheme.background
+                )
             )
-        }
+        },
+        containerColor = MaterialTheme.colorScheme.background
     ) { padding ->
-        if (dueCards.isEmpty()) {
-            Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(16.dp)) {
-                    Icon(Icons.Default.CheckCircle, contentDescription = null, modifier = Modifier.size(64.dp), tint = Color(0xFF4CAF50))
-                    Spacer(modifier = Modifier.height(16.dp))
-                    Text("Tuyệt vời! Bạn đã hoàn thành hết các thẻ cần ôn tập.", textAlign = androidx.compose.ui.text.style.TextAlign.Center)
-                    Button(onClick = onFinish, modifier = Modifier.padding(top = 16.dp)) { Text("Quay lại") }
-                }
-            }
-        } else if (showReviewSummary && lastReviewedCard != null) {
-            Box(modifier = Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(16.dp)) {
-                    Text("Đã ghi nhận kết quả!", style = MaterialTheme.typography.headlineSmall)
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        "Ngày ôn tập tiếp theo: ${SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(Date(lastReviewedCard!!.nextReviewDate))}",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.primary
-                    )
-                    Spacer(modifier = Modifier.height(24.dp))
-                    
-                    Row {
-                        Button(onClick = {
-                            showReviewSummary = false
-                            if (currentIndex >= dueCards.size) {
-                                // Nếu hết thẻ, quay về (thực ra flow.collectAsState sẽ cập nhật dueCards rỗng)
-                                // Nhưng an toàn thì ta check currentIndex
-                            }
-                        }) {
-                            Text(if (currentIndex < dueCards.size) "Thẻ tiếp theo" else "Hoàn thành")
-                        }
-                        
-                        Spacer(modifier = Modifier.width(16.dp))
-                        
-                        OutlinedButton(
-                            onClick = {
-                                viewModel.deleteFlashcard(lastReviewedCard!!)
-                                showReviewSummary = false
-                            },
-                            colors = ButtonDefaults.outlinedButtonColors(contentColor = MaterialTheme.colorScheme.error)
-                        ) {
-                            Icon(Icons.Default.Delete, contentDescription = null)
-                            Text(" Xóa thẻ")
-                        }
-                    }
-                }
-            }
-        } else if (currentIndex < dueCards.size) {
-            val currentCard = dueCards[currentIndex]
+        Box(modifier = Modifier.fillMaxSize().padding(padding)) {
+            if (dueCards.isEmpty()) {
+                CompletionView(onFinish)
+            } else if (currentIndex < dueCards.size) {
+                val currentCard = dueCards[currentIndex]
 
-            Column(
-                modifier = Modifier.fillMaxSize().padding(padding).padding(16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center
-            ) {
-                Text("Thẻ số ${currentIndex + 1} / ${dueCards.size}", style = MaterialTheme.typography.labelLarge)
-                Spacer(modifier = Modifier.height(16.dp))
-
-                Card(
+                Column(
                     modifier = Modifier
-                        .fillMaxWidth()
-                        .height(350.dp)
-                        .graphicsLayer {
-                            rotationY = rotation
-                            cameraDistance = 12 * density
-                        }
-                        .padding(8.dp),
-                    elevation = CardDefaults.cardElevation(8.dp),
-                    onClick = { 
-                        if (!isFrontRevealed) {
-                            isFrontRevealed = true
-                            ttsHelper.speak(currentCard.front)
-                        } else if (!isFlippedToBack) {
-                            isFlippedToBack = true
-                        }
-                    }
+                        .fillMaxSize()
+                        .padding(24.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    // Modern Progress Bar
+                    LinearProgressIndicator(
+                        progress = { (currentIndex + 1).toFloat() / dueCards.size },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .height(10.dp)
+                            .clip(CircleShape),
+                        color = MaterialTheme.colorScheme.primary,
+                        trackColor = MaterialTheme.colorScheme.surfaceVariant,
+                    )
+                    
+                    Spacer(modifier = Modifier.height(32.dp))
+
+                    // Flashcard
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .fillMaxWidth()
+                            .graphicsLayer {
+                                rotationY = rotation
+                                cameraDistance = 12 * density
+                            }
+                            .shadow(
+                                elevation = 12.dp,
+                                shape = RoundedCornerShape(32.dp),
+                                ambientColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.2f),
+                                spotColor = MaterialTheme.colorScheme.primary
+                            )
+                            .clip(RoundedCornerShape(32.dp))
+                            .background(MaterialTheme.colorScheme.surface)
+                            .clickable { isFlippedToBack = !isFlippedToBack },
+                        contentAlignment = Alignment.Center
+                    ) {
                         if (rotation <= 90f) {
-                            Text(
-                                text = if (!isFrontRevealed) "Bấm để xem từ vựng" else currentCard.front,
-                                style = MaterialTheme.typography.headlineMedium,
-                                textAlign = androidx.compose.ui.text.style.TextAlign.Center,
-                                color = if (!isFrontRevealed) MaterialTheme.colorScheme.outline else MaterialTheme.colorScheme.onSurface
-                            )
+                            // FRONT SIDE
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                modifier = Modifier.padding(32.dp)
+                            ) {
+                                Surface(
+                                    color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.3f),
+                                    shape = CircleShape,
+                                    modifier = Modifier.size(64.dp)
+                                ) {
+                                    IconButton(onClick = { ttsHelper.speak(currentCard.front) }) {
+                                        Icon(
+                                            Icons.Default.VolumeUp, 
+                                            contentDescription = "Phát âm",
+                                            tint = MaterialTheme.colorScheme.primary,
+                                            modifier = Modifier.size(32.dp)
+                                        )
+                                    }
+                                }
+                                Spacer(modifier = Modifier.height(24.dp))
+                                Text(
+                                    text = currentCard.front,
+                                    style = MaterialTheme.typography.displaySmall.copy(
+                                        fontWeight = FontWeight.Bold,
+                                        letterSpacing = 1.sp
+                                    ),
+                                    textAlign = TextAlign.Center,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                                Spacer(modifier = Modifier.height(48.dp))
+                                Text(
+                                    "Chạm để xem nghĩa",
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = MaterialTheme.colorScheme.outline.copy(alpha = 0.6f)
+                                )
+                            }
                         } else {
-                            Text(
-                                text = currentCard.back,
-                                style = MaterialTheme.typography.headlineMedium,
-                                modifier = Modifier.graphicsLayer { rotationY = 180f },
-                                color = MaterialTheme.colorScheme.primary
-                            )
+                            // BACK SIDE
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                modifier = Modifier
+                                    .padding(32.dp)
+                                    .graphicsLayer { rotationY = 180f }
+                            ) {
+                                Text(
+                                    text = "NGHĨA CỦA TỪ",
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = MaterialTheme.colorScheme.primary,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Spacer(modifier = Modifier.height(16.dp))
+                                Text(
+                                    text = currentCard.back,
+                                    style = MaterialTheme.typography.headlineMedium.copy(
+                                        fontWeight = FontWeight.SemiBold
+                                    ),
+                                    color = MaterialTheme.colorScheme.onSurface,
+                                    textAlign = TextAlign.Center
+                                )
+                            }
                         }
                     }
-                }
 
-                Spacer(modifier = Modifier.height(32.dp))
+                    Spacer(modifier = Modifier.height(32.dp))
 
-                if (!isFrontRevealed) {
-                    Button(onClick = { 
-                        isFrontRevealed = true 
-                        ttsHelper.speak(currentCard.front)
-                    }) { Text("Xem từ vựng") }
-                } else if (!isFlippedToBack) {
-                    Button(onClick = { isFlippedToBack = true }) { Text("Xem nghĩa (Lật thẻ)") }
-                } else {
-                    Text("Bạn nhớ từ này thế nào?", style = MaterialTheme.typography.titleMedium)
-                    Spacer(modifier = Modifier.height(12.dp))
-                    
-                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            QualityButton("Quên", 0, Color(0xFFE57373), Modifier.weight(1f)) {
-                                val updated = com.example.kiemtrack.srs.SM2Logic.calculateNextReview(currentCard, 0)
-                                viewModel.updateFlashcardQuality(currentCard, 0)
-                                lastReviewedCard = updated
-                                showReviewSummary = true
-                                // Không tăng currentIndex ở đây vì thẻ có thể bị đẩy xuống cuối hoặc biến mất khỏi due list
+                    // Controls
+                    AnimatedContent(
+                        targetState = isFlippedToBack,
+                        transitionSpec = {
+                            fadeIn(tween(300)) togetherWith fadeOut(tween(300))
+                        }, label = "controlsTransition"
+                    ) { flipped ->
+                        if (!flipped) {
+                            Button(
+                                onClick = { isFlippedToBack = true },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(64.dp),
+                                shape = RoundedCornerShape(20.dp),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = MaterialTheme.colorScheme.primary
+                                ),
+                                elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp)
+                            ) {
+                                Text("LẬT THẺ", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold))
                             }
-                            QualityButton("Khó", 2, Color(0xFFFFB74D), Modifier.weight(1f)) {
-                                val updated = com.example.kiemtrack.srs.SM2Logic.calculateNextReview(currentCard, 2)
-                                viewModel.updateFlashcardQuality(currentCard, 2)
-                                lastReviewedCard = updated
-                                showReviewSummary = true
-                            }
-                        }
-                        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            QualityButton("Tốt", 4, Color(0xFF81C784), Modifier.weight(1f)) {
-                                val updated = com.example.kiemtrack.srs.SM2Logic.calculateNextReview(currentCard, 4)
-                                viewModel.updateFlashcardQuality(currentCard, 4)
-                                lastReviewedCard = updated
-                                showReviewSummary = true
-                            }
-                            QualityButton("Dễ", 5, Color(0xFF64B5F6), Modifier.weight(1f)) {
-                                val updated = com.example.kiemtrack.srs.SM2Logic.calculateNextReview(currentCard, 5)
-                                viewModel.updateFlashcardQuality(currentCard, 5)
-                                lastReviewedCard = updated
-                                showReviewSummary = true
+                        } else {
+                            Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                                Text(
+                                    "Bạn thấy từ này thế nào?",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = MaterialTheme.colorScheme.outline
+                                )
+                                Spacer(modifier = Modifier.height(16.dp))
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
+                                    QualityButton("Quên", Color(0xFFEF4444), Modifier.weight(1f)) {
+                                        viewModel.updateFlashcardQuality(currentCard, 0)
+                                        currentIndex++
+                                    }
+                                    QualityButton("Khó", Color(0xFFF59E0B), Modifier.weight(1f)) {
+                                        viewModel.updateFlashcardQuality(currentCard, 2)
+                                        currentIndex++
+                                    }
+                                    QualityButton("Tốt", Color(0xFF10B981), Modifier.weight(1f)) {
+                                        viewModel.updateFlashcardQuality(currentCard, 4)
+                                        currentIndex++
+                                    }
+                                    QualityButton("Dễ", Color(0xFF3B82F6), Modifier.weight(1f)) {
+                                        viewModel.updateFlashcardQuality(currentCard, 5)
+                                        currentIndex++
+                                    }
+                                }
                             }
                         }
                     }
@@ -207,18 +248,83 @@ fun StudyScreen(
 }
 
 @Composable
-fun QualityButton(label: String, quality: Int, color: Color, modifier: Modifier, onClick: () -> Unit) {
-    Button(
-        onClick = onClick,
-        modifier = modifier.height(48.dp),
-        colors = ButtonDefaults.buttonColors(containerColor = color)
+fun CompletionView(onFinish: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(32.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.Center
     ) {
-        Text(label, color = Color.White)
+        val gradient = Brush.linearGradient(
+            colors = listOf(MaterialTheme.colorScheme.primary, Color(0xFF818CF8))
+        )
+        
+        Box(
+            modifier = Modifier
+                .size(120.dp)
+                .background(gradient, CircleShape),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                Icons.Default.CheckCircle,
+                contentDescription = null,
+                modifier = Modifier.size(64.dp),
+                tint = Color.White
+            )
+        }
+        
+        Spacer(modifier = Modifier.height(32.dp))
+        
+        Text(
+            "Tuyệt vời!",
+            style = MaterialTheme.typography.headlineLarge.copy(fontWeight = FontWeight.ExtraBold),
+            color = MaterialTheme.colorScheme.onBackground
+        )
+        
+        Spacer(modifier = Modifier.height(12.dp))
+        
+        Text(
+            "Bạn đã hoàn thành tất cả các thẻ của ngày hôm nay. Hãy duy trì thói quen này nhé!",
+            textAlign = TextAlign.Center,
+            style = MaterialTheme.typography.bodyLarge,
+            color = MaterialTheme.colorScheme.outline
+        )
+        
+        Spacer(modifier = Modifier.height(48.dp))
+        
+        Button(
+            onClick = onFinish,
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(60.dp),
+            shape = RoundedCornerShape(20.dp),
+            elevation = ButtonDefaults.buttonElevation(defaultElevation = 4.dp)
+        ) {
+            Text("Về Trang Chủ", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold))
+        }
     }
 }
 
-private fun updateQuality(viewModel: FlashcardViewModel, card: Flashcard, quality: Int, onComplete: (Flashcard) -> Unit) {
-    val updatedCard = com.example.kiemtrack.srs.SM2Logic.calculateNextReview(card, quality)
-    viewModel.updateFlashcardQuality(card, quality)
-    onComplete(updatedCard)
+@Composable
+fun QualityButton(label: String, color: Color, modifier: Modifier, onClick: () -> Unit) {
+    Surface(
+        onClick = onClick,
+        modifier = modifier.height(70.dp),
+        shape = RoundedCornerShape(16.dp),
+        color = color.copy(alpha = 0.1f),
+        border = androidx.compose.foundation.BorderStroke(1.dp, color.copy(alpha = 0.2f))
+    ) {
+        Column(
+            modifier = Modifier.fillMaxSize(),
+            verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally
+        ) {
+            Text(
+                label,
+                style = MaterialTheme.typography.labelLarge.copy(fontWeight = FontWeight.Bold),
+                color = color
+            )
+        }
+    }
 }

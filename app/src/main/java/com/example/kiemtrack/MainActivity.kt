@@ -15,7 +15,9 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Info
+import androidx.compose.material.icons.filled.List
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -72,21 +74,16 @@ class MainActivity : ComponentActivity() {
                     composable("home") {
                         HomeScreen(
                             viewModel = viewModel,
-                            onStartStudy = { courseId -> 
-                                navController.navigate("study/$courseId") 
+                            onStartStudy = { 
+                                navController.navigate("study") 
                             },
                             onAddCard = { navController.navigate("add") }
                         )
                     }
-                    composable(
-                        route = "study/{courseId}",
-                        arguments = listOf(navArgument("courseId") { type = NavType.StringType })
-                    ) { backStackEntry ->
-                        val courseId = backStackEntry.arguments?.getString("courseId")
+                    composable("study") {
                         StudyScreen(
                             viewModel = viewModel,
                             ttsHelper = ttsHelper ?: TtsHelper(this@MainActivity),
-                            courseId = courseId,
                             onFinish = { navController.popBackStack() }
                         )
                     }
@@ -105,14 +102,14 @@ class MainActivity : ComponentActivity() {
         val currentDate = Calendar.getInstance()
         val dueDate = Calendar.getInstance()
 
-        // Thiết lập thời gian thông báo vào 9:00 AM
-        dueDate.set(Calendar.HOUR_OF_DAY, 9)
-        dueDate.set(Calendar.MINUTE, 0)
+        // Thiết lập thời gian thông báo vào 15:27
+        dueDate.set(Calendar.HOUR_OF_DAY, 15)
+        dueDate.set(Calendar.MINUTE, 27)
         dueDate.set(Calendar.SECOND, 0)
 
-        // Nếu đã qua 9:00 AM thì hẹn vào sáng mai
+        // Nếu đã qua 15:27 thì hẹn vào ngày mai
         if (dueDate.before(currentDate)) {
-            dueDate.add(Calendar.HOUR_OF_DAY, 24)
+            dueDate.add(Calendar.DAY_OF_YEAR, 1)
         }
 
         val initialDelay = dueDate.timeInMillis - currentDate.timeInMillis
@@ -138,106 +135,119 @@ class MainActivity : ComponentActivity() {
 @Composable
 fun HomeScreen(
     viewModel: FlashcardViewModel, 
-    onStartStudy: (String) -> Unit,
+    onStartStudy: () -> Unit,
     onAddCard: () -> Unit
 ) {
     val allCards by viewModel.allCards.collectAsState(initial = emptyList())
-    val courses by viewModel.getAllCourses().collectAsState(initial = emptyList())
-    val dateFormat = remember { SimpleDateFormat("HH:mm dd/MM", Locale.getDefault()) }
 
     Scaffold(
         floatingActionButton = {
-            FloatingActionButton(onClick = onAddCard) {
-                Icon(Icons.Default.Add, contentDescription = "Thêm thẻ")
-            }
+            ExtendedFloatingActionButton(
+                onClick = onAddCard,
+                icon = { Icon(Icons.Default.Add, contentDescription = null) },
+                text = { Text("Thêm từ mới") },
+                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                contentColor = MaterialTheme.colorScheme.onPrimaryContainer
+            )
         }
     ) { padding ->
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(16.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
+                .padding(horizontal = 20.dp),
+            horizontalAlignment = Alignment.Start
         ) {
-            Text("Học qua Flashcard", style = MaterialTheme.typography.headlineLarge)
             Spacer(modifier = Modifier.height(24.dp))
+            Text(
+                "Chào mừng bạn,", 
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.outline
+            )
+            Text(
+                "Bắt đầu ngay!", 
+                style = MaterialTheme.typography.headlineLarge,
+                color = MaterialTheme.colorScheme.onSurface
+            )
             
-            Text("Danh sách bài học:", style = MaterialTheme.typography.titleMedium)
+            Spacer(modifier = Modifier.height(32.dp))
+            
+            Text(
+                "Tiến độ tổng quát", 
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.secondary
+            )
+            Spacer(modifier = Modifier.height(16.dp))
+
+            val allDueCardsCount = allCards.count { it.nextReviewDate <= System.currentTimeMillis() }
+            
+            Card(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(140.dp),
+                onClick = onStartStudy,
+                colors = CardDefaults.cardColors(
+                    containerColor = if (allDueCardsCount > 0) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.primaryContainer
+                ),
+                elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxSize().padding(24.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column {
+                        Text("Tất cả từ vựng", style = MaterialTheme.typography.headlineSmall)
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text("Tổng cộng: ${allCards.size} từ", style = MaterialTheme.typography.bodyLarge)
+                    }
+                    if (allDueCardsCount > 0) {
+                        Surface(
+                            color = MaterialTheme.colorScheme.error,
+                            shape = MaterialTheme.shapes.extraLarge
+                        ) {
+                            Text(
+                                "Cần xem: $allDueCardsCount", 
+                                modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp),
+                                color = Color.White,
+                                style = MaterialTheme.typography.labelLarge
+                            )
+                        }
+                    } else {
+                        Icon(Icons.Default.CheckCircle, contentDescription = null, tint = Color(0xFF2E7D32), modifier = Modifier.size(48.dp))
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(32.dp))
+            
+            Text(
+                "Danh sách từ vựng", 
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.secondary
+            )
             Spacer(modifier = Modifier.height(12.dp))
 
             LazyColumn(
                 modifier = Modifier.fillMaxSize(),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                verticalArrangement = Arrangement.spacedBy(12.dp),
+                contentPadding = PaddingValues(bottom = 88.dp)
             ) {
-                item {
-                    val allDueCardsCount = allCards.count { it.nextReviewDate <= System.currentTimeMillis() }
+                items(allCards) { card ->
                     Card(
                         modifier = Modifier.fillMaxWidth(),
-                        onClick = { onStartStudy("All") },
-                        colors = CardDefaults.cardColors(
-                            containerColor = if (allDueCardsCount > 0) MaterialTheme.colorScheme.errorContainer else MaterialTheme.colorScheme.primaryContainer
-                        )
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
                     ) {
                         ListItem(
-                            headlineContent = { Text("Tất cả thẻ", style = MaterialTheme.typography.titleMedium) },
-                            supportingContent = { 
-                                Column {
-                                    Text("Tổng số: ${allCards.size} thẻ")
-                                    if (allDueCardsCount > 0) {
-                                        Text("Cần ôn tập ngay: $allDueCardsCount thẻ", color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
-                                    } else {
-                                        Text("Tuyệt vời! Bạn đã học hết thẻ hôm nay", color = Color(0xFF2E7D32), style = MaterialTheme.typography.bodySmall)
-                                    }
+                            headlineContent = { Text(card.front, style = MaterialTheme.typography.titleMedium) },
+                            supportingContent = { Text(card.back, style = MaterialTheme.typography.bodySmall) },
+                            trailingContent = {
+                                IconButton(onClick = { viewModel.deleteFlashcard(card) }) {
+                                    Icon(Icons.Default.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.outline)
                                 }
-                            },
-                            colors = ListItemDefaults.colors(containerColor = Color.Transparent)
+                            }
                         )
-                    }
-                }
-
-                items(courses) { course ->
-                    if (course != "All") {
-                        val cardsInCourse = allCards.filter { it.courseId == course }
-                        val dueInCourse = cardsInCourse.count { it.nextReviewDate <= System.currentTimeMillis() }
-                        val isCompleted = cardsInCourse.isNotEmpty() && dueInCourse == 0
-                        val lastReview = cardsInCourse.map { it.lastReviewDate }.maxOrNull() ?: 0L
-
-                        Card(
-                            modifier = Modifier.fillMaxWidth(),
-                            onClick = { onStartStudy(course) },
-                            colors = CardDefaults.cardColors(
-                                containerColor = if (isCompleted) Color(0xFFE8F5E9) else MaterialTheme.colorScheme.surfaceVariant
-                            )
-                        ) {
-                            ListItem(
-                                headlineContent = { Text(course, style = MaterialTheme.typography.titleMedium) },
-                                supportingContent = { 
-                                    Column {
-                                        Text("Tổng số: ${cardsInCourse.size} thẻ")
-                                        if (dueInCourse > 0) {
-                                            Text("Cần ôn tập: $dueInCourse thẻ", color = MaterialTheme.colorScheme.error)
-                                        }
-                                        if (lastReview > 0L) {
-                                            Text("Lần cuối: ${dateFormat.format(Date(lastReview))}", style = MaterialTheme.typography.bodySmall)
-                                        }
-                                    }
-                                },
-                                trailingContent = {
-                                    Row {
-                                        Icon(
-                                            imageVector = if (isCompleted) Icons.Default.CheckCircle else Icons.Default.Info,
-                                            contentDescription = null,
-                                            tint = if (isCompleted) Color(0xFF2E7D32) else MaterialTheme.colorScheme.outline
-                                        )
-                                        Spacer(Modifier.width(8.dp))
-                                        IconButton(onClick = { viewModel.deleteCourse(course) }) {
-                                            Icon(Icons.Default.Delete, contentDescription = null, tint = MaterialTheme.colorScheme.error)
-                                        }
-                                    }
-                                },
-                                colors = ListItemDefaults.colors(containerColor = Color.Transparent)
-                            )
-                        }
                     }
                 }
             }
@@ -250,12 +260,11 @@ fun HomeScreen(
 fun AddCardScreen(viewModel: FlashcardViewModel, onFinish: () -> Unit) {
     var front by remember { mutableStateOf("") }
     var back by remember { mutableStateOf("") }
-    var courseId by remember { mutableStateOf("") }
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text("Tạo thẻ mới") },
+            CenterAlignedTopAppBar(
+                title = { Text("Thêm từ mới", style = MaterialTheme.typography.titleLarge) },
                 navigationIcon = {
                     IconButton(onClick = onFinish) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Quay lại")
@@ -268,42 +277,53 @@ fun AddCardScreen(viewModel: FlashcardViewModel, onFinish: () -> Unit) {
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
-                .padding(16.dp),
+                .padding(24.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            OutlinedTextField(
-                value = courseId,
-                onValueChange = { courseId = it },
-                label = { Text("Tên khóa học (VD: Tiếng Anh)") },
-                modifier = Modifier.fillMaxWidth(),
-                placeholder = { Text("Nhập tên nhóm/khóa học") }
+            Icon(
+                imageVector = Icons.Default.Edit,
+                contentDescription = null,
+                modifier = Modifier.size(64.dp),
+                tint = MaterialTheme.colorScheme.primary
             )
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(32.dp))
+
             OutlinedTextField(
                 value = front,
                 onValueChange = { front = it },
-                label = { Text("Mặt trước (Từ vựng)") },
-                modifier = Modifier.fillMaxWidth()
+                label = { Text("Từ vựng") },
+                modifier = Modifier.fillMaxWidth(),
+                shape = MaterialTheme.shapes.medium
             )
-            Spacer(modifier = Modifier.height(8.dp))
+            Spacer(modifier = Modifier.height(16.dp))
+            
             OutlinedTextField(
                 value = back,
                 onValueChange = { back = it },
-                label = { Text("Mặt sau (Kết quả/Nghĩa)") },
-                modifier = Modifier.fillMaxWidth()
+                label = { Text("Kết quả / Nghĩa") },
+                modifier = Modifier.fillMaxWidth(),
+                shape = MaterialTheme.shapes.medium,
+                minLines = 3
             )
-            Spacer(modifier = Modifier.height(24.dp))
+            
+            Spacer(modifier = Modifier.weight(1f))
+            
             Button(
                 onClick = {
-                    if (front.isNotBlank() && back.isNotBlank() && courseId.isNotBlank()) {
-                        viewModel.addFlashcard(front, back, courseId)
+                    if (front.isNotBlank() && back.isNotBlank()) {
+                        viewModel.addFlashcard(front.trim(), back.trim())
                         onFinish()
                     }
                 },
-                modifier = Modifier.fillMaxWidth().height(56.dp)
+                modifier = Modifier.fillMaxWidth().height(56.dp),
+                shape = MaterialTheme.shapes.medium,
+                enabled = front.isNotBlank() && back.isNotBlank()
             ) {
-                Text("Lưu vào khóa học")
+                Icon(Icons.Default.Add, contentDescription = null)
+                Spacer(Modifier.width(8.dp))
+                Text("Tạo từ vựng ngay")
             }
+            Spacer(modifier = Modifier.height(16.dp))
         }
     }
 }
