@@ -9,11 +9,8 @@ data class Flashcard(
     val remoteId: String = "",
     val front: String = "",
     val back: String = "",
-    // SM-2 fields
-    val interval: Int = 0,
-    val repetitions: Int = 0,
-    val easeFactor: Float = 2.5f,
     val nextReviewDate: Long = System.currentTimeMillis(),
-    val lastReviewDate: Long = 0L, // Thời gian cuối cùng học thẻ này
-    val courseId: String = ""
+    val lastReviewDate: Long = 0L,
+    val courseId: String = "",
+    val lastQuality: Int = 3 // 0: Khó, 3: Vừa, 5: Dễ
 )
