@@ -7,7 +7,6 @@ import androidx.room.PrimaryKey
 data class Flashcard(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val remoteId: String = "",
-    val courseId: String = "default_course",
     val front: String = "",
     val back: String = "",
     // SM-2 fields
@@ -15,5 +14,6 @@ data class Flashcard(
     val repetitions: Int = 0,
     val easeFactor: Float = 2.5f,
     val nextReviewDate: Long = System.currentTimeMillis(),
-    val lastReviewDate: Long = 0L // Thời gian cuối cùng học thẻ này
+    val lastReviewDate: Long = 0L, // Thời gian cuối cùng học thẻ này
+    val courseId: String = ""
 )

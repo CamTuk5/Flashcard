@@ -28,20 +28,28 @@ class FlashcardViewModel(application: Application) : AndroidViewModel(applicatio
                 viewModelScope.launch {
                     val cards = result.toObjects(Flashcard::class.java)
                     cards.forEach { card ->
+                        // Kiểm tra nếu thẻ chưa có trong local (dựa trên remoteId) thì mới thêm
+                        // Hoặc cập nhật thẻ cũ dựa trên logic của bạn
                         dao.insertFlashcard(card)
                     }
                 }
             }
     }
     
-    fun addFlashcard(front: String, back: String, courseId: String = "Chung") {
+    fun addFlashcard(front: String, back: String) {
         viewModelScope.launch {
-            val card = Flashcard(front = front, back = back, courseId = courseId)
+            // Tạo remoteId duy nhất bằng UUID
+            val uniqueRemoteId = java.util.UUID.randomUUID().toString()
+            val card = Flashcard(
+                front = front, 
+                back = back, 
+                remoteId = uniqueRemoteId
+            )
             val id = dao.insertFlashcard(card)
             
-            // ĐẨY LÊN BACKEND (FIRESTORE)
+            // ĐẨY LÊN BACKEND dùng remoteId làm tên Document
             val remoteCard = card.copy(id = id)
-            firestore.collection("flashcards").document(id.toString()).set(remoteCard)
+            firestore.collection("flashcards").document(uniqueRemoteId).set(remoteCard)
         }
     }
 
@@ -50,16 +58,18 @@ class FlashcardViewModel(application: Application) : AndroidViewModel(applicatio
             val updatedCard = SM2Logic.calculateNextReview(flashcard, quality)
             dao.updateFlashcard(updatedCard)
             
-            // CẬP NHẬT TIẾN ĐỘ LÊN BACKEND
-            firestore.collection("flashcards").document(flashcard.id.toString()).set(updatedCard)
+            // CẬP NHẬT LÊN BACKEND dùng remoteId
+            val docId = if (flashcard.remoteId.isNotEmpty()) flashcard.remoteId else flashcard.id.toString()
+            firestore.collection("flashcards").document(docId).set(updatedCard)
         }
     }
 
     fun deleteFlashcard(flashcard: Flashcard) {
         viewModelScope.launch {
             dao.deleteFlashcard(flashcard)
-            // XOÁ TRÊN BACKEND
-            firestore.collection("flashcards").document(flashcard.id.toString()).delete()
+            // XOÁ TRÊN BACKEND dùng remoteId
+            val docId = if (flashcard.remoteId.isNotEmpty()) flashcard.remoteId else flashcard.id.toString()
+            firestore.collection("flashcards").document(docId).delete()
         }
     }
 
@@ -72,17 +82,5 @@ class FlashcardViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun getDueCards(currentTime: Long): Flow<List<Flashcard>> {
         return dao.getDueFlashcards(currentTime)
-    }
-
-    fun getDueCardsByCourse(courseId: String, currentTime: Long): Flow<List<Flashcard>> {
-        return if (courseId == "All" || courseId == "Chung") {
-            dao.getDueFlashcards(currentTime)
-        } else {
-            dao.getDueFlashcardsByCourse(courseId, currentTime)
-        }
-    }
-    
-    fun getAllCourses(): Flow<List<String>> {
-        return dao.getAllCourseIds()
     }
 }
