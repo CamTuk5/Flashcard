@@ -35,10 +35,17 @@ import java.util.Locale
 fun StudyScreen(
     viewModel: FlashcardViewModel = viewModel(),
     ttsHelper: TtsHelper,
+    categoryName: String? = null,
     onFinish: () -> Unit
 ) {
     val currentTime = remember { System.currentTimeMillis() }
-    val dueCards by viewModel.getDueCards(currentTime).collectAsState(initial = emptyList())
+    
+    // SỬA: Lọc thẻ theo chủ đề (categoryName) nếu có
+    val dueCards by if (categoryName == null || categoryName == "All") {
+        viewModel.getDueCards(currentTime)
+    } else {
+        viewModel.getDueCardsByCourse(categoryName, currentTime)
+    }.collectAsState(initial = emptyList())
     
     var currentIndex by remember { mutableIntStateOf(0) }
     var isFrontRevealed by remember { mutableStateOf(false) }
@@ -51,7 +58,6 @@ fun StudyScreen(
         animationSpec = tween(durationMillis = 500), label = "cardRotation"
     )
 
-    // SỬA LỖI: Key theo ID của thẻ. Khi ID thay đổi (thẻ mới), tự động reset trạng thái.
     val currentCard = dueCards.getOrNull(currentIndex)
     LaunchedEffect(currentCard?.id) {
         isFrontRevealed = false
@@ -63,7 +69,7 @@ fun StudyScreen(
             CenterAlignedTopAppBar(
                 title = { 
                     Text(
-                        "Ôn tập từ vựng",
+                        if (categoryName == null || categoryName == "All") "Ôn tập tổng hợp" else "Ôn tập: $categoryName",
                         style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
                     ) 
                 },
@@ -86,7 +92,6 @@ fun StudyScreen(
                     card = lastReviewedCard!!,
                     onNext = {
                         showReviewSummary = false
-                        // Reset ngay lập tức khi nhấn "Từ tiếp theo"
                         isFrontRevealed = false
                         isFlippedToBack = false
                     },
@@ -149,7 +154,7 @@ fun EmptyState(onFinish: () -> Unit) {
         )
         Spacer(modifier = Modifier.height(8.dp))
         Text(
-            "Bạn đã hoàn thành hết các thẻ cần ôn tập cho hôm nay.",
+            "Bạn đã hoàn thành hết các thẻ cần ôn tập cho chủ đề này.",
             style = MaterialTheme.typography.bodyLarge,
             color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.6f),
             textAlign = TextAlign.Center
@@ -336,7 +341,7 @@ fun StudyContent(
         } else {
             Column(horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(
-                    "Bạn đánh giá mức độ ghi nhớ thế nào?",
+                    "Bạn nhớ từ này mức độ nào?",
                     style = MaterialTheme.typography.titleSmall,
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f)
                 )
