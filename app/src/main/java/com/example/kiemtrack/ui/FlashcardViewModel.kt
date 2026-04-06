@@ -44,7 +44,7 @@ class FlashcardViewModel(application: Application) : AndroidViewModel(applicatio
                 front = front, 
                 back = back, 
                 remoteId = uniqueRemoteId,
-                courseId = category // Dùng trường courseId để lưu chủ đề
+                courseId = category
             )
             val id = dao.insertFlashcard(card)
             
@@ -93,5 +93,9 @@ class FlashcardViewModel(application: Application) : AndroidViewModel(applicatio
 
     fun getDueCards(currentTime: Long): Flow<List<Flashcard>> {
         return dao.getDueFlashcards(currentTime)
+    }
+
+    fun getDueCardsByCourse(category: String, currentTime: Long): Flow<List<Flashcard>> {
+        return dao.getDueFlashcardsByCourse(category, currentTime)
     }
 }
